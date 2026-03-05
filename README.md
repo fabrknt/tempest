@@ -53,19 +53,36 @@ Since Uniswap v4 ticks are `log₁.₀₀₀₁(price)`, tick differences ARE lo
 
 ```
 tempest/
-├── contracts/           # Foundry project (Solidity)
+├── contracts/              # Foundry project (Solidity)
 │   ├── src/
 │   │   ├── TempestHook.sol
 │   │   └── libraries/
 │   │       ├── TickObserver.sol
 │   │       ├── VolatilityEngine.sol
 │   │       └── FeeCurve.sol
-│   ├── test/            # 80 tests (unit + integration + fuzz)
-│   └── script/          # Deployment & CREATE2 mining
-├── keeper/              # Off-chain keeper service (TypeScript/viem)
-├── sdk/                 # TypeScript SDK
-└── dashboard/           # Next.js 15 frontend
+│   ├── test/               # 80 tests (unit + integration + fuzz)
+│   └── script/             # Deployment & CREATE2 mining
+├── packages/
+│   ├── core/               # @tempest/core — pure types & algorithms (no dependencies)
+│   │   └── src/
+│   │       ├── types.ts    # Regime, VolState, FeeConfig, PoolInfo, VolSample
+│   │       └── lp.ts       # estimateIL() — concentrated liquidity IL estimation
+│   └── evm/                # @tempest/evm — EVM client (depends on @tempest/core + viem)
+│       └── src/
+│           ├── TempestClient.ts   # PublicClient facade
+│           ├── fees.ts            # getCurrentFee()
+│           ├── oracle.ts          # getVolatility(), getRegime(), getVolState()
+│           ├── lp.ts              # getRecommendedRange()
+│           └── abis/              # Contract ABIs
+├── apps/
+│   ├── keeper/             # Off-chain keeper service (TypeScript/viem)
+│   └── dashboard/          # Next.js 15 frontend
 ```
+
+The SDK is split into two packages:
+
+- **`@tempest/core`** — Pure TypeScript types and algorithms with zero dependencies. Use this when you only need volatility types (e.g., `Regime`, `VolState`) or pure math (`estimateIL`) without any chain interaction.
+- **`@tempest/evm`** — EVM-specific client built on viem. Depends on `@tempest/core` and re-exports all of its types for convenience.
 
 ## Contracts
 
@@ -101,6 +118,12 @@ Main Uniswap v4 hook tying everything together:
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - Node.js 18+
 
+### Install Dependencies
+
+```bash
+npm install   # installs all workspace packages
+```
+
 ### Build & Test Contracts
 
 ```bash
@@ -110,11 +133,17 @@ forge test
 forge test --gas-report
 ```
 
+### Run Core Tests
+
+```bash
+cd packages/core
+npm test
+```
+
 ### Run Keeper
 
 ```bash
-cd keeper
-npm install
+cd apps/keeper
 cp .env.example .env  # Configure RPC_URL, PRIVATE_KEY, HOOK_ADDRESS, POOL_IDS
 npm start
 ```
@@ -122,19 +151,29 @@ npm start
 ### Run Dashboard
 
 ```bash
-cd dashboard
-npm install
+cd apps/dashboard
 npm run dev
 ```
 
-The dashboard runs with mock data by default — connect it to a deployed hook via the SDK for live data.
+The dashboard runs with mock data by default — connect it to a deployed hook via `@tempest/evm` for live data.
 
 ### SDK Usage
+
+Use `@tempest/core` for pure types and algorithms (no chain dependency):
+
+```typescript
+import { Regime, REGIME_NAMES, estimateIL } from "@tempest/core";
+
+const il = estimateIL(5000, -1000, 1000, 30); // 30-day IL estimate at 50% vol
+console.log(`Estimated IL: ${il.toFixed(2)}%`);
+```
+
+Use `@tempest/evm` for on-chain reads via viem:
 
 ```typescript
 import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
-import { TempestClient } from "@tempest/sdk";
+import { TempestClient } from "@tempest/evm";
 
 const client = createPublicClient({ chain: mainnet, transport: http() });
 const tempest = new TempestClient(client, "0x...");
@@ -167,6 +206,7 @@ const range = await tempest.getRecommendedRange(poolId, currentTick);
 - **Keeper pattern**: Vol computation is too expensive for every swap. Off-chain keeper amortizes the cost, incentivized by ETH rewards.
 - **Piecewise linear fees**: Simple, predictable, governance-adjustable. No complex curves or oracles.
 - **No external oracles**: All data comes from the pool's own swap history. Fully self-contained.
+- **Chain-agnostic core**: Pure types and algorithms in `@tempest/core` can be used without any EVM dependency, enabling reuse in simulations, dashboards, or other chain integrations.
 
 ## License
 
