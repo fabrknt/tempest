@@ -6,6 +6,7 @@ contracts/cache/
 node_modules/
 dist/
 .next/
+.turbo/
 
 # Environment
 .env
