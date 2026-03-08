@@ -35,4 +35,62 @@ describe("estimateIL", () => {
     const defaulted = estimateIL(5000, -1000, 1000);
     expect(explicit).toBe(defaulted);
   });
+
+  it("returns 0 for zero volatility", () => {
+    expect(estimateIL(0, -1000, 1000, 30)).toBe(0);
+  });
+
+  it("returns 0 for negative range (lower > upper)", () => {
+    expect(estimateIL(5000, 1000, -1000)).toBe(0);
+  });
+
+  it("returns 0 for equal lower and upper ticks", () => {
+    expect(estimateIL(5000, 500, 500)).toBe(0);
+  });
+
+  it("produces a finite positive number for typical inputs", () => {
+    const il = estimateIL(3000, -500, 500, 14);
+    expect(il).toBeGreaterThan(0);
+    expect(il).toBeLessThanOrEqual(100);
+    expect(Number.isFinite(il)).toBe(true);
+  });
+
+  it("returns result proportional to volBps squared", () => {
+    const il1 = estimateIL(1000, -1000, 1000, 30);
+    const il2 = estimateIL(2000, -1000, 1000, 30);
+    // Doubling vol should quadruple IL (vol^2 relationship)
+    expect(il2 / il1).toBeCloseTo(4, 1);
+  });
+
+  it("returns result proportional to holding period", () => {
+    const il1 = estimateIL(3000, -1000, 1000, 30);
+    const il2 = estimateIL(3000, -1000, 1000, 60);
+    // Doubling time should double IL (linear in time)
+    expect(il2 / il1).toBeCloseTo(2, 1);
+  });
+
+  it("handles very small range width (1 tick)", () => {
+    const il = estimateIL(5000, 0, 1, 30);
+    // Very narrow range => very high IL, capped at 100
+    expect(il).toBe(100);
+  });
+
+  it("handles very large range width", () => {
+    const il = estimateIL(1000, -50000, 50000, 30);
+    // Very wide range => very low IL
+    expect(il).toBeGreaterThanOrEqual(0);
+    expect(il).toBeLessThan(1);
+  });
+
+  it("handles 1-day holding period", () => {
+    const il = estimateIL(5000, -1000, 1000, 1);
+    expect(il).toBeGreaterThan(0);
+    expect(il).toBeLessThan(estimateIL(5000, -1000, 1000, 30));
+  });
+
+  it("handles 365-day holding period", () => {
+    const il = estimateIL(5000, -1000, 1000, 365);
+    expect(il).toBeGreaterThan(0);
+    expect(il).toBeLessThanOrEqual(100);
+  });
 });

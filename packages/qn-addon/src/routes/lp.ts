@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { instanceLookup } from "../middleware/instance-lookup";
-import { Regime, REGIME_NAMES, estimateIL } from "@tempest/core";
+import { Regime, REGIME_NAMES, estimateIL, classifyRegime } from "@tempest/core";
 
 const router: import("express").Router = Router();
 
@@ -33,25 +33,16 @@ router.post("/range", (req: Request, res: Response) => {
     // --- Range recommendation logic ---
     // Higher vol => wider range to reduce rebalancing frequency
     // Lower vol => tighter range for more capital efficiency
-    let regime: Regime;
-    let rangeMultiplier: number;
+    const regime = classifyRegime(volBps);
 
-    if (volBps < 200) {
-      regime = Regime.VeryLow;
-      rangeMultiplier = 0.5;
-    } else if (volBps < 500) {
-      regime = Regime.Low;
-      rangeMultiplier = 1.0;
-    } else if (volBps < 1500) {
-      regime = Regime.Normal;
-      rangeMultiplier = 2.0;
-    } else if (volBps < 3000) {
-      regime = Regime.High;
-      rangeMultiplier = 4.0;
-    } else {
-      regime = Regime.Extreme;
-      rangeMultiplier = 8.0;
-    }
+    const RANGE_MULTIPLIERS: Record<Regime, number> = {
+      [Regime.VeryLow]: 0.5,
+      [Regime.Low]: 1.0,
+      [Regime.Normal]: 2.0,
+      [Regime.High]: 4.0,
+      [Regime.Extreme]: 8.0,
+    };
+    const rangeMultiplier = RANGE_MULTIPLIERS[regime];
 
     // Base range width in ticks (1 tick ~= 1 bps price movement)
     const baseWidth = 200;
@@ -116,12 +107,7 @@ router.post("/il-estimate", (req: Request, res: Response) => {
     const ilPercent = estimateIL(volBps, rangeLower, rangeUpper, days);
 
     // Classify regime for context
-    let regime: Regime;
-    if (volBps < 200) regime = Regime.VeryLow;
-    else if (volBps < 500) regime = Regime.Low;
-    else if (volBps < 1500) regime = Regime.Normal;
-    else if (volBps < 3000) regime = Regime.High;
-    else regime = Regime.Extreme;
+    const regime = classifyRegime(volBps);
 
     res.json({
       volBps,

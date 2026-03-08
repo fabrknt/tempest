@@ -1,6 +1,13 @@
 import { Router, Request, Response } from "express";
 import { instanceLookup } from "../middleware/instance-lookup";
-import { Regime, REGIME_NAMES } from "@tempest/core";
+import {
+  Regime,
+  REGIME_NAMES,
+  classifyRegime,
+  interpolateFee,
+  DEFAULT_FEE_CONFIG,
+  type FeeConfig,
+} from "@tempest/core";
 
 const router: import("express").Router = Router();
 
@@ -8,35 +15,6 @@ const router: import("express").Router = Router();
 /*  Shared middleware: all fee routes require an active instance       */
 /* ------------------------------------------------------------------ */
 router.use(instanceLookup);
-
-/* ------------------------------------------------------------------ */
-/*  Default fee schedule — piecewise linear vol-to-fee mapping        */
-/* ------------------------------------------------------------------ */
-const DEFAULT_FEE_SCHEDULE = [
-  { regime: Regime.VeryLow, volFloorBps: 0, volCeilBps: 200, feeBps: 1 },
-  { regime: Regime.Low, volFloorBps: 200, volCeilBps: 500, feeBps: 5 },
-  { regime: Regime.Normal, volFloorBps: 500, volCeilBps: 1500, feeBps: 30 },
-  { regime: Regime.High, volFloorBps: 1500, volCeilBps: 3000, feeBps: 60 },
-  { regime: Regime.Extreme, volFloorBps: 3000, volCeilBps: 10000, feeBps: 100 },
-];
-
-function interpolateFee(volBps: number): number {
-  for (const tier of DEFAULT_FEE_SCHEDULE) {
-    if (volBps >= tier.volFloorBps && volBps < tier.volCeilBps) {
-      return tier.feeBps;
-    }
-  }
-  // Above all tiers — use max fee
-  return DEFAULT_FEE_SCHEDULE[DEFAULT_FEE_SCHEDULE.length - 1].feeBps;
-}
-
-function classifyRegime(volBps: number): Regime {
-  if (volBps < 200) return Regime.VeryLow;
-  if (volBps < 500) return Regime.Low;
-  if (volBps < 1500) return Regime.Normal;
-  if (volBps < 3000) return Regime.High;
-  return Regime.Extreme;
-}
 
 /* ------------------------------------------------------------------ */
 /*  POST /calculate — Calculate dynamic fee for given volatility      */
@@ -75,14 +53,29 @@ router.post("/calculate", (req: Request, res: Response) => {
 /* ------------------------------------------------------------------ */
 router.get("/schedule", (_req: Request, res: Response) => {
   try {
-    const schedule = DEFAULT_FEE_SCHEDULE.map((tier) => ({
-      regime: Regime[tier.regime],
-      regimeLabel: REGIME_NAMES[tier.regime],
-      volFloorBps: tier.volFloorBps,
-      volCeilBps: tier.volCeilBps,
-      feeBps: tier.feeBps,
-      feePercent: parseFloat((tier.feeBps / 100).toFixed(4)),
-    }));
+    // Derive schedule from DEFAULT_FEE_CONFIG breakpoints
+    const cfg = DEFAULT_FEE_CONFIG;
+    const breakpoints: Array<{ vol: number; fee: number }> = [
+      { vol: Number(cfg.vol0), fee: cfg.fee0 },
+      { vol: Number(cfg.vol1), fee: cfg.fee1 },
+      { vol: Number(cfg.vol2), fee: cfg.fee2 },
+      { vol: Number(cfg.vol3), fee: cfg.fee3 },
+      { vol: Number(cfg.vol4), fee: cfg.fee4 },
+      { vol: Number(cfg.vol5), fee: cfg.fee5 },
+    ];
+
+    const schedule = breakpoints.map((bp, i) => {
+      const regime = classifyRegime(bp.vol);
+      const nextVol = i < breakpoints.length - 1 ? breakpoints[i + 1].vol : bp.vol;
+      return {
+        regime: Regime[regime],
+        regimeLabel: REGIME_NAMES[regime],
+        volFloorBps: bp.vol,
+        volCeilBps: nextVol,
+        feeBps: bp.fee,
+        feePercent: parseFloat((bp.fee / 100).toFixed(4)),
+      };
+    });
 
     res.json({ schedule });
   } catch (err) {

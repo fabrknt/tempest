@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { instanceLookup } from "../middleware/instance-lookup";
-import { Regime, REGIME_NAMES } from "@tempest/core";
+import { Regime, REGIME_NAMES, classifyRegime } from "@tempest/core";
 
 const router: import("express").Router = Router();
 
@@ -46,12 +46,7 @@ router.post("/compute", (req: Request, res: Response) => {
     const volBps = Math.round(annualizedVol * 10000);
 
     // Classify regime
-    let regime: Regime;
-    if (volBps < 200) regime = Regime.VeryLow;
-    else if (volBps < 500) regime = Regime.Low;
-    else if (volBps < 1500) regime = Regime.Normal;
-    else if (volBps < 3000) regime = Regime.High;
-    else regime = Regime.Extreme;
+    const regime = classifyRegime(volBps);
 
     res.json({
       volBps,
@@ -128,12 +123,7 @@ router.post("/history", (req: Request, res: Response) => {
 
     for (let t = startTime; t <= end; t += stepSeconds) {
       const mockVol = 500 + Math.round(Math.sin(t / 10000) * 300);
-      let regime: Regime;
-      if (mockVol < 200) regime = Regime.VeryLow;
-      else if (mockVol < 500) regime = Regime.Low;
-      else if (mockVol < 1500) regime = Regime.Normal;
-      else if (mockVol < 3000) regime = Regime.High;
-      else regime = Regime.Extreme;
+      const regime = classifyRegime(mockVol);
 
       samples.push({
         timestamp: t,
