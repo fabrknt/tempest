@@ -63,13 +63,16 @@ tempest/
 │   ├── test/               # 80 tests (unit + integration + fuzz)
 │   └── script/             # Deployment & CREATE2 mining
 ├── packages/
-│   ├── core/               # @tempest/core — pure types & algorithms (no dependencies)
+│   ├── core/               # @tempest/core — chain-agnostic types, algorithms & client
 │   │   └── src/
 │   │       ├── types.ts    # Regime, VolState, FeeConfig, PoolInfo, VolSample
+│   │       ├── adapter.ts  # Chain, ChainAdapter interface
+│   │       ├── client.ts   # TempestClient (chain-agnostic, accepts any ChainAdapter)
+│   │       ├── fees.ts     # classifyRegime(), interpolateFee()
 │   │       └── lp.ts       # estimateIL() — concentrated liquidity IL estimation
-│   ├── evm/                # @tempest/evm — EVM client (depends on @tempest/core + viem)
+│   ├── evm/                # @tempest/evm — EVM adapter (depends on @tempest/core + viem)
 │   │   └── src/
-│   │       ├── TempestClient.ts   # PublicClient facade
+│   │       ├── EvmAdapter.ts      # ChainAdapter implementation for EVM/viem
 │   │       ├── fees.ts            # getCurrentFee()
 │   │       ├── oracle.ts          # getVolatility(), getRegime(), getVolState()
 │   │       ├── lp.ts              # getRecommendedRange()
@@ -85,10 +88,10 @@ tempest/
 
 The monorepo is managed with **pnpm** (v10.31.0) and **turbo** for build orchestration. Internal dependencies use the `workspace:*` protocol.
 
-The SDK is split into two packages:
+The SDK is split into three packages:
 
-- **`@tempest/core`** — Pure TypeScript types and algorithms with zero dependencies. Use this when you only need volatility types (e.g., `Regime`, `VolState`) or pure math (`estimateIL`) without any chain interaction.
-- **`@tempest/evm`** — EVM-specific client built on viem. Depends on `@tempest/core` and re-exports all of its types for convenience.
+- **`@tempest/core`** — Chain-agnostic types, algorithms, and client with zero dependencies. Defines the `ChainAdapter` interface and a `TempestClient` that accepts any adapter. Use this when you only need volatility types (e.g., `Regime`, `VolState`), pure math (`estimateIL`), or want to build a custom chain adapter.
+- **`@tempest/evm`** — EVM adapter implementing `ChainAdapter` via viem. Depends on `@tempest/core` and re-exports all of its types for convenience.
 - **`@tempest/qn-addon`** — QuickNode Marketplace add-on (slug: `fabrknt-dynamic-fees`). An Express server exposing Tempest's volatility engine as a hosted API. Depends on `@tempest/core`.
 
 ## Contracts
@@ -187,14 +190,28 @@ Use `@tempest/evm` for on-chain reads via viem:
 ```typescript
 import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
-import { TempestClient } from "@tempest/evm";
+import { TempestClient, EvmAdapter } from "@tempest/evm";
 
-const client = createPublicClient({ chain: mainnet, transport: http() });
-const tempest = new TempestClient(client, "0x...");
+const viem = createPublicClient({ chain: mainnet, transport: http() });
+const adapter = new EvmAdapter(viem, "0x...");
+const tempest = new TempestClient(adapter);
 
 const { currentVol, regime } = await tempest.getVolatility(poolId);
 const fee = await tempest.getCurrentFee(poolId);
 const range = await tempest.getRecommendedRange(poolId, currentTick);
+```
+
+To add support for a new chain, implement the `ChainAdapter` interface from `@tempest/core`:
+
+```typescript
+import type { ChainAdapter } from "@tempest/core";
+
+class MySvmAdapter implements ChainAdapter {
+  readonly chain = "solana";
+  async getVolState(poolId: string) { /* ... */ }
+  async getCurrentFee(poolId: string) { /* ... */ }
+  // ...
+}
 ```
 
 ## Deployment
