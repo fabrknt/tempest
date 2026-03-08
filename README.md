@@ -77,6 +77,11 @@ tempest/
 │   │       ├── oracle.ts          # getVolatility(), getRegime(), getVolState()
 │   │       ├── lp.ts              # getRecommendedRange()
 │   │       └── abis/              # Contract ABIs
+│   ├── solana/              # @tempest/solana — Solana adapter scaffold
+│   │   └── src/
+│   │       ├── SolanaAdapter.ts   # ChainAdapter implementation (awaiting program deployment)
+│   │       ├── pda.ts             # PDA derivation (vol_state, fee_config, tick_buffer)
+│   │       └── accounts.ts       # Expected on-chain account structures
 │   └── qn-addon/            # @tempest/qn-addon — QuickNode Marketplace add-on
 │       ├── addon.json        # QN Marketplace manifest (slug: fabrknt-dynamic-fees)
 │       └── src/
@@ -92,6 +97,7 @@ The SDK is split into three packages:
 
 - **`@tempest/core`** — Chain-agnostic types, algorithms, and client with zero dependencies. Defines the `ChainAdapter` interface and a `TempestClient` that accepts any adapter. Use this when you only need volatility types (e.g., `Regime`, `VolState`), pure math (`estimateIL`), or want to build a custom chain adapter.
 - **`@tempest/evm`** — EVM adapter implementing `ChainAdapter` via viem. Depends on `@tempest/core` and re-exports all of its types for convenience.
+- **`@tempest/solana`** — Solana adapter scaffold implementing `ChainAdapter`. Includes PDA derivation and expected on-chain account structures. Awaiting Solana program deployment.
 - **`@tempest/qn-addon`** — QuickNode Marketplace add-on (slug: `fabrknt-dynamic-fees`). An Express server exposing Tempest's volatility engine as a hosted API. Depends on `@tempest/core`.
 
 ## Contracts
