@@ -17,12 +17,12 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@fabrknt/tempest-core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.90.21(react@19.2.4)
-      '@tempest/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       next:
         specifier: ^15.1.0
         version: 15.5.12(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -66,7 +66,7 @@ importers:
 
   apps/keeper:
     dependencies:
-      '@tempest/evm':
+      '@fabrknt/tempest-evm':
         specifier: workspace:*
         version: link:../../packages/evm
       dotenv:
@@ -97,7 +97,7 @@ importers:
 
   packages/evm:
     dependencies:
-      '@tempest/core':
+      '@fabrknt/tempest-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -113,7 +113,7 @@ importers:
 
   packages/qn-addon:
     dependencies:
-      '@tempest/core':
+      '@fabrknt/tempest-core':
         specifier: workspace:*
         version: link:../core
       better-sqlite3:
@@ -156,12 +156,12 @@ importers:
 
   packages/solana:
     dependencies:
+      '@fabrknt/tempest-core':
+        specifier: workspace:*
+        version: link:../core
       '@solana/web3.js':
         specifier: ^1.95.0
         version: 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@tempest/core':
-        specifier: workspace:*
-        version: link:../core
     devDependencies:
       tsup:
         specifier: ^8.0.0
